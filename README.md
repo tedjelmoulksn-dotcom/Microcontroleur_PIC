@@ -1,6 +1,10 @@
 # PIC16F877A — Bare-Metal C and Assembly Laboratories
 
-Register-level exercises on the Microchip PICDEM 2 Plus board: GPIO sequencing, software timing, push-button input and external-interrupt handling. The repository also preserves assembly exercises illustrating control flow and seven-segment output.
+PIC16F877A C and assembly exercises in GPIO, timing and external interrupts.
+
+![Separate programs on the PICDEM 2 Plus board.](assets/project-overview.svg)
+
+*Separate programs on the PICDEM 2 Plus board.*
 
 ## Hardware and toolchain
 
