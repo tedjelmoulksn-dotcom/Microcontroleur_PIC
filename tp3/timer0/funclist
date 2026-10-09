@@ -1,0 +1,7 @@
+_allume_led_D2: CODE, 1910 0 4
+_eteint_led_D2: CODE, 1906 0 4
+_init_port: CODE, 1914 0 4
+_main: CODE, 1966 0 37
+_delay_1s: CODE, 2003 0 45
+_delay_s: CODE, 1931 0 35
+Total: 129

@@ -1,0 +1,40 @@
+void write_data_eeprom (char offset, char valeur)
+{
+
+char EEADR;
+EEADR=offset;		//mon W ici cest le offset et ici cest phase 1
+
+EEADATA=valeur ;	//phase 2 initialisation de EEADATA avec ma valeur 
+
+EEPGD=0;		//remise a zero de mon EEPGD
+WREN=1;			//ouvrir la fenetre d'ecriture 
+//VOIR OHASE 5
+
+EECON2=0x55;		//phase 6
+EECON2=0xAA;		//phase6
+
+WR=1;			//on compmence l'ecriture 
+
+
+GIE=1;
+WREN=0;
+
+}while (WR=!0)
+
+retrun ;
+}
+
+
+char read_data_eeprom (char offset) 
+{
+
+
+EEADR=write_data_eeprom(adresse,valeur);
+EEPGD=0; //selection des donnes 
+RD=1 ;//pour lecture 
+EEADATA=EEADR;
+
+
+retrun(EEADATA)
+
+}

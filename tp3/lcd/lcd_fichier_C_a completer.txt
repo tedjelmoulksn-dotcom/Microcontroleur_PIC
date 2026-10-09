@@ -1,0 +1,67 @@
+     
+// Programme canevas de base pour d�marrer une application en C
+// avec l'outil HI-TECH Software PICC 
+// sur la carte PICDEM 2 PLUS DEMO BOARD 
+
+#include "pic.h"			// vos headers associ�s
+#include "pic168xa.h"		// � vos projets
+#include "lcdbt.h"
+
+//#include <stdio.h> 
+
+#define bit(x) (1<<(x))
+
+ __CONFIG(HS & WDTDIS &  BOREN &  LVPDIS );
+int i;	
+
+
+void	init_PORTD (void)
+{
+	TRISD0=0;
+	TRISD1=0;
+	TRISD2=0;
+	TRISD3=0;
+	TRISD4=0;
+	TRISD5=0;
+	TRISD6=0;
+	TRISD7=0;
+}
+void LCD_ON (void)
+{
+	init_PORTD();
+	RS=0;
+	RW=0;
+	EN=0;
+	VCC=0;//selon le shema , c'est pour avoir une ddp; jai le 5 volt mais le 0
+}
+
+	
+
+void main(void)
+{
+	init_PORTD();					// fixe la direction des lignes du PORTD
+	allume_LCD();					// allume le LCD
+	init_LCD();					// initialise le LCD
+
+//	print_char('A');				// fonction � �crire
+
+	print_string("Le PIC 16F877");			// fonction � �crire
+	goto_ligne_2();					// fonction � �crire			
+	print_string("c'est fastoche");			// fonction � �crire
+	tempo_N_ms(3000);
+	efface();					// fonction � �crire
+for(i=1;i<17;i++)
+	{
+	go_to(i);					// fonction � �crire
+	print_char(0xFF);
+	tempo_N_ms(100);
+	}
+	go_to(17);
+	print_string("   READY !!!"); 			// fonction � �crire
+	
+	while(1);	
+}	
+
+	
+
+    

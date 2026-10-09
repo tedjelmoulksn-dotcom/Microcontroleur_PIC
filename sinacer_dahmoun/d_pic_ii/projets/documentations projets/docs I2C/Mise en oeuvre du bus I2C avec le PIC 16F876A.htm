@@ -1,0 +1,1078 @@
+
+<!-- saved from url=(0118)http://fabrice.sincere.pagesperso-orange.fr/cm_electronique/projet_pic/aidememoire/16F876A_bus_I2C/bus_I2C_16F876A.htm -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Mise en oeuvre du bus I2C avec le PIC 16F876A</title>
+
+<meta name="keywords" content="Microchip,cours,PIC,16F876A,16F877A,bus I2C,Inter Integrated Circuit,MSSP,SSP,SDA,SCL,maître,esclave,fabrice sincere,DS1631,DS1731,DS1307,MAX517,MAX518,24xx64">
+<script type="text/javascript">
+//<![CDATA[
+var gs_d=new Date,DoW=gs_d.getDay();gs_d.setDate(gs_d.getDate()-(DoW+6)%7+3);
+var ms=gs_d.valueOf();gs_d.setMonth(0);gs_d.setDate(4);
+var gs_r=(Math.round((ms-gs_d.valueOf())/6048E5)+1)*gs_d.getFullYear();
+var gs_p = (("https:" == document.location.protocol) ? "https://" : "http://");
+document.write(unescape("%3Cscript src='" + gs_p + "s.gstat.orange.fr/lib/gs.js?"+gs_r+"' type='text/javascript'%3E%3C/script%3E"));
+//]]>
+</script><script src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/gs.js" type="text/javascript"></script>
+</head>
+
+<body bgcolor="#FFFFCC">
+<p><b><a href="http://fabrice.sincere.pagesperso-orange.fr/cm_electronique/pic_accueil.htm#16F876A"><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/prev1.gif" width="32" height="32" border="0"></a></b><font size="6" color="#000000"><b><font color="#800000"> 
+  <font color="#0000FF">Le bus I2C</font></font></b></font></p>
+<p><font size="6" color="#000000"><b><font color="#800000">Mise en oeuvre avec 
+  le microcontrôleur PIC 16F876A</font></b></font></p>
+<p>&nbsp;</p>
+<ul>
+  <li><font size="4" color="#800000"><b><font size="5">1 - Présentation 
+    du bus I2C</font></b></font></li>
+  <li><font size="5" color="#800000"><b>2 - Technologie du bus I2C : sorties de 
+    type drain ouvert (ou collecteur ouvert)</b></font></li>
+  <li><font size="5" color="#800000"><b>3 - Exemple de communication entre un 
+    maître (PIC 16F876A) et un esclave</b></font></li>
+  <li><font size="5" color="#800000"><b>4 - Le module MSSP du PIC 16F876A</b></font><font size="4" color="#800000"><b><font size="5">, 
+    programmé en langage assembleur</font></b></font><font size="5" color="#800000"></font></li>
+  <li><b><font size="5" color="#800000">5 - Le module SSP du PIC 16F88</font></b></li>
+  <li><font size="5" color="#800000"><b>6 - Bibliographie</b></font></li>
+</ul>
+<p>&nbsp;</p>
+<p><font size="4"><b><font size="5">1- Présentation du bus I2C</font></b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">Le bus I2C (Inter-Integrated Circuit) est un bus populaire développé 
+  par la société Philips dans les années 1980.</font></p>
+<p><font size="4">Le bus I2C est un <b>bus série synchrone</b> bifilaire 
+  :</font></p>
+<ul>
+  <li><font size="4"><b>SDA</b> (Serial Data Line) : ligne de données bidirectionnelle</font></li>
+  <li><font size="4"><b>SCL</b> (Serial Clock Line) : horloge de synchronisation</font> 
+    <font size="4">bidirectionnelle</font> 
+    <p><font size="4">N.B. Cela fait 3 fils en comptant la masse.</font></p>
+    <p><font size="4"><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_01.GIF" width="655" height="210"></font></p>
+  </li>
+</ul>
+<p>&nbsp;</p>
+<p><font size="4">Le bus I2C est contrôlé par un maître (c'est 
+  généralement un microcontrôleur, par exemple un PIC 16F876A).</font></p>
+<p><font size="4">Le bus I2C peut avoir plusieurs maîtres (on parle alors 
+  de mode multi-maîtres), mais à un instant donné, un seul 
+  maître contrôle le bus I2C.</font></p>
+<p><font size="4">Le bus I2C possède un ou plusieurs esclaves (un bus I2C 
+  sans esclaves ne sert à rien !).</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><b><font color="#FF0000">Un esclave est identifié par 
+  une adresse unique</font></b> (sur 7 bits ou parfois 10 bits)</font></p>
+<p><font size="4">Exemple d'esclaves :</font></p>
+<ul>
+  <li><font size="4">DS1307 : horloge temps réel (Real Time Clock)</font> 
+    <ul>
+      <li><font size="4">Adresse 7 bits (1 1 0 1 0 0 0)</font></li>
+    </ul>
+  </li>
+  <li><font size="4">MAX517 / MAX 518 : convertisseur numérique analogique 
+    (DAC) de résolution 8 bits</font></li>
+  <ul>
+    <li><font size="4">Adresse 7 bits (0 1 0 1 1 A1 A0)</font></li>
+    <li><font size="4">A1 et A0 correspondent aux niveaux logiques appliqués 
+      à ces 2 entrées</font></li>
+    <li><font size="4">On peut donc connecter jusqu'à 4 boîtiers 
+      MAX517 / MAX518 sur un bus I2C</font></li>
+  </ul>
+  <li><font size="4">DS1631 / DS1731 : thermomètre numérique</font> 
+    <ul>
+      <li><font size="4">Adresse 7 bits (1 0 0 1 A2 A1 A0)</font></li>
+      <li><font size="4">A2, A1 et A0 correspondent aux niveaux logiques appliqués 
+        à ces 3 entrées</font></li>
+      <li><font size="4">On peut donc connecter jusqu'à 8 boîtiers 
+        DS1631 / DS1731 sur un bus I2C</font></li>
+    </ul>
+  </li>
+  <li><font size="4">24xx64 : EEPROM série 64 kbits</font> 
+    <ul>
+      <li><font size="4">Adresse 7 bits (1 0 1 0 A2 A1 A0)</font></li>
+      <li><font size="4">A2, A1 et A0 correspondent aux niveaux logiques appliqués 
+        à ces 3 entrées</font></li>
+      <li><font size="4">On peut donc connecter jusqu'à 8 boîtiers 
+        24xx64 sur un bus I2C (soit 512 kbits)</font></li>
+    </ul>
+    <p>&nbsp;</p>
+    <p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_02.GIF" width="466" height="306"></p>
+  </li>
+</ul>
+<blockquote> 
+  <p><font size="4">N.B. Deux esclaves ne doivent pas avoir la même adresse.</font></p>
+  <p><font size="4">N.B. Un maître n'a pas d'adresse.</font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4" color="#0000FF"><b><font color="#FF0000">Le dialogue se fait 
+  uniquement entre un maître et un esclave.</font></b></font></p>
+<p>&nbsp;</p>
+<p><b><font size="4" color="#FF0000">Le dialogue est toujours initié par 
+  le maître </font></b><font size="4" color="#000000">(<a href="http://fabrice.sincere.pagesperso-orange.fr/cm_electronique/projet_pic/aidememoire/16F876A_bus_I2C/bus_I2C_16F876A.htm#3"><b><i>condition 
+  Start</i></b></a>) : le maître envoie sur le bus I2C l'adresse de l'esclave 
+  avec qui il veut communiquer.</font></p>
+<p><b><font size="4" color="#FF0000">Le dialogue est toujours terminé par 
+  le maître </font></b><font size="4" color="#000000">(<a href="http://fabrice.sincere.pagesperso-orange.fr/cm_electronique/projet_pic/aidememoire/16F876A_bus_I2C/bus_I2C_16F876A.htm#3"><b><i>condition 
+  Stop</i></b></a>).</font></p>
+<p><b><font size="4" color="#FF0000">Le signal d'horloge (SCL) est généré 
+  par le maître.</font></b></p>
+<p><font size="4">La fréquence de l'horloge (f SCL) prend trois valeurs 
+  typiques :</font></p>
+<ul>
+  <li><font size="4">100 kHz (100 kilobits par seconde) : mode standard</font></li>
+  <li><font size="4">400 kHz (400 kb/s) : Fast mode</font></li>
+  <li> <font size="4">1 MHz (1 Mb/s) : High-speed mode</font> 
+    <p><font size="4"><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_01.GIF" width="655" height="210"></font></p>
+  </li>
+</ul>
+<blockquote> 
+  <p><font size="4">N.B. Le PIC 16F876A peut travailler dans le mode High-speed, 
+    le DS1307 dans le mode standard et le DS1631 dans le mode Fast.</font></p>
+  <p><font size="4" color="#FF0000"><b>C'est l'élément le plus lent 
+    qui impose la fréquence de l'horloge du bus I2C</b></font><font size="4"> 
+    : ici 100 kHz (DS1307). </font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b><font color="#FF0000">Par définition, les données 
+  transitent de l'<i>émetteur</i> vers le <i>récepteur</i>.</font></b></font></p>
+<p><font size="4">Deux cas se présentent :</font></p>
+<ul>
+  <li><font size="4">Transfert de données du maître vers l'esclave</font> 
+    <p><font size="4"> L'émetteur est le maître et le récepteur 
+      est l'esclave.</font></p>
+    <p><font size="4">Les données transitent sur la ligne SDA, au rythme 
+      imposé par le maître (horloge SCL).</font></p>
+    <p><font size="4">Exemple : Ecriture dans une EEPROM 24xx64</font></p>
+  </li>
+</ul>
+<p>&nbsp;</p>
+<ul>
+  <li><font size="4">Transfert de données de l'esclave vers le maître</font> 
+    <p><font size="4"> L'émetteur est l'esclave et le récepteur 
+      est le maître.</font></p>
+    <p><font size="4">C'est l'esclave qui place les données sur la ligne 
+      SDA, au rythme imposé par le maître (horloge SCL).</font></p>
+    <p><font size="4">Exemple : Lecture d'une EEPROM 24xx64</font></p>
+  </li>
+</ul>
+<p>&nbsp;</p>
+<p><font size="4">N.B. Des dispositifs sont prévus pour contrôler 
+  le bon déroulement du transfert (<a href="http://fabrice.sincere.pagesperso-orange.fr/cm_electronique/projet_pic/aidememoire/16F876A_bus_I2C/bus_I2C_16F876A.htm#3"><b><i>bit 
+  Acknowledge</i></b></a>).</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><b><font size="5">2 - Technologie du bus I2C : sorties de type 
+  drain ouvert (ou collecteur ouvert)</font></b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">Les circuits connectés sur un bus I2C ont des sorties 
+  de type drain ouvert (ou collecteur ouvert), ce qui permet de faire un ET logique 
+  "câblé".</font></p>
+<p><font size="4">Deux résistances de pull-up sont bien sûr placées 
+  entre les lignes SDA et SCL et l'alimentation (VDD).</font></p>
+<p><font size="4">Quand le bus n'est pas utilisé, SDA et SCL sont au niveau 
+  haut (niveau de repos).</font></p>
+<p>&nbsp;</p>
+<p><font size="4">Quand une ligne (SDA ou SCL) est au repos (niveau 1), on peut 
+  la forcer à 0.</font></p>
+<p><font size="4">Quand une ligne (SDA ou SCL) est au niveau 0, on ne peut pas 
+  la forcer à 1.</font></p>
+<p><font size="4">Dans l'exemple ci-dessous, l'horloge SCL est au niveau 0 car 
+  c'est le PIC 16F876A (maître) qui force cette ligne à 0 :</font></p>
+<p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_03.GIF" width="876" height="438"></p>
+<p><font size="4">N.B. Le DS1307 fonctionne toujours en esclave : ce n'est donc 
+  jamais lui qui agit sur l'état de l'horloge (SCL).</font></p>
+<p>&nbsp;</p>
+<blockquote>
+  <p><a href="http://fabrice.sincere.pagesperso-orange.fr/electronique1.htm#22"><font size="4"><b><i>En savoir 
+    plus sur la configuration de sortie de type collecteur ouvert</i></b></font></a></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b><font size="5"><a name="3"></a>3 - Exemple de communication 
+  entre un maître (PIC 16F876A) et un esclave</font></b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">Le protocole de communication du bus I2C est décrit en 
+  détails dans le document de référence :</font></p>
+<blockquote>
+  <p><a href="http://www.nxp.com/acrobat_download/literature/9398/39340011.pdf"><font size="4"><b><i>	
+    Spécifications complètes du bus I2C version 2.1</i></b></font></a></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4">Nous verrons l'exemple de l'esclave DS1307.</font></p>
+<p><font size="4">Le circuit Dallas DS1307 est une horloge temps réel (Real 
+  Time Clock), qui fournit secondes, minutes, heures, jours, dates, mois et années.</font></p>
+<p><font size="4">Les années bissextiles sont prises en compte (jusqu'en 
+  2100).</font></p>
+<p><font size="4">Le DS1307 travaille dans le mode standard (fréquence 
+  d'horloge f SCL de 100 kHz).</font></p>
+<p><font size="4">L'adresse I2C (7 bits) du DS1307 est : 1 1 0 1 0 0 0 (adresse 
+  fixée par le constructeur =&gt; adresse non modifiable).</font></p>
+<p>&nbsp;</p>
+<ul>
+  <li><font size="4">Exemple d'écriture du DS1307</font></li>
+</ul>
+<p><font size="4">L'émetteur est le maître et le récepteur 
+  est l'esclave.</font></p>
+<p>&nbsp;</p>
+<p><font size="4">Le registre d'adresse 0x04 du DS1307 contient la date (cf. datasheet 
+  du DS1307).</font></p>
+<p><font size="4">Pour régler le calendrier au 27 du mois, il faut écrire 
+  la donnée 0x27 (codage BCD) dans le registre d'adresse 0x04 du DS1307.</font></p>
+<p><font size="4">Le bus I2C utilise le protocole suivant :</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_datawrite.GIF" width="593" height="167"></font></p>
+<p>&nbsp; </p>
+<blockquote>
+  <p><font size="4">1) Pour initier le dialogue, le maître crée une 
+    condition <b>Start</b></font></p>
+  <p><font size="4">2) Le maître envoie l'adresse de l'esclave (1010100) 
+    suivi du bit 0 (bit Write)</font></p>
+  <p><font size="4">3) L'esclave répond (accusé de réception 
+    : bit Acknowledge)</font></p>
+  <p><font size="4">4) Le maître envoie l'adresse du registre (0x04) à 
+    écrire </font></p>
+  <p><font size="4">5) L'esclave répond (accusé de réception 
+    : bit Acknowledge)</font></p>
+  <p><font size="4">6) Le maître envoie la donnée (0x27) à 
+    écrire</font></p>
+  <p><font size="4">7) L'esclave écrit la donnée puis envoie un 
+    accusé de réception (bit Acknowledge)</font></p>
+  <p><font size="4">8) Le maître termine le dialogue avec une condition 
+    <b>Stop</b></font></p>
+  <p><font size="4">Le bus I2C est maintement libre (SCL = 1, SDA = 1 : niveaux 
+    de repos).</font></p>
+  <p>&nbsp;</p>
+  <p><font size="4">C'est simple, non ?</font></p>
+  <p><font size="4">Un peu moins évident, le chronogramme correspondant 
+    des lignes SDA et SCL :</font></p>
+</blockquote>
+<p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_datawrite_chrono.GIF"></p>
+<blockquote> 
+  <p>&nbsp;</p>
+  <p><font size="4">Plus précisément, la <b>condition Start</b> 
+    est définie par la transition de la ligne SDA du niveau haut au niveau 
+    bas, SCL étant au niveau haut.</font></p>
+  <p><font size="4">C'est bien sûr le maître qui force la ligne SDA 
+    au niveau bas :</font></p>
+  <p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2Cstart.GIF" width="270" height="201"></p>
+  <p><font size="4">C'est exactement la même chose avec la condition <b>Repeated 
+    Start</b> :</font></p>
+  <p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2Crepeatedstart.GIF" width="270" height="201"></p>
+  <p>&nbsp;</p>
+  <p><font size="4">La <b>condition Stop</b> est définie par la transition 
+    de la ligne SDA du niveau bas au niveau haut, SCL étant au niveau haut. 
+    </font></p>
+  <p><font size="4">C'est bien sûr le maître qui agit sur la ligne 
+    SDA :</font></p>
+  <p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2Cstop.GIF" width="271" height="202"></p>
+  <p>&nbsp;</p>
+  <p><font size="4">En dehors de ces trois conditions, <b>la ligne SDA ne peut 
+    changer de niveau que lorsque SCL est au niveau bas</b> :</font></p>
+  <p>&nbsp;</p>
+</blockquote>
+<ul>
+  <li><font size="4">Transmission d'un bit de donnée</font></li>
+</ul>
+<blockquote> 
+  <p><font size="4">La donnée présente sur la ligne SDA doit être 
+    stable sur l'intervalle de temps où SCL est au niveau haut.</font></p>
+  <p><font size="4">C'est l'émetteur qui agit sur la ligne SDA, et c'est 
+    évidemment le maître qui génère le signal d'horloge 
+    SCL.</font></p>
+  <p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2Cdata.GIF" width="271" height="202"></p>
+  <p><font size="4">N.B. Les données sont transmises octet par octet (1 
+    octet = 8 bits)</font></p>
+  <p>&nbsp;</p>
+</blockquote>
+<ul>
+  <li><font size="4">Bit <b>Acknowledge</b></font></li>
+</ul>
+<blockquote> 
+  <p><font size="4">Le protocole est le même que pour la transmission d'un 
+    bit de donnée.</font></p>
+  <p><font size="4">2 cas :</font></p>
+  <p><font size="4">- bit Acknowledge (master to slave)</font></p>
+  <blockquote> 
+    <p><font size="4">Le bit Acknowledge est généré par le 
+      maître (le maître force la ligne SDA au niveau 0).</font></p>
+  </blockquote>
+  <p><font size="4">- bit Acknowledge (slave to master)</font></p>
+  <blockquote>
+    <p><font size="4">Le bit Acknowledge est généré par un 
+      esclave (l'esclave force la ligne SDA au niveau 0).</font></p>
+  </blockquote>
+  <p>&nbsp; </p>
+  <p><font size="4"><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_ACK.GIF" width="271" height="202"></font></p>
+  <p>&nbsp;</p>
+</blockquote>
+<ul>
+  <li><font size="4">Bit <b>Not Acknowledge</b></font></li>
+</ul>
+<blockquote> 
+  <p><font size="4">Le protocole est le même que pour la transmission d'un 
+    bit de donnée.</font></p>
+  <p><font size="4">Le bit Not Acknowledge est toujours généré 
+    par le maître (le maître ramène la ligne SDA au niveau 
+    1).</font></p>
+  <p>&nbsp;</p>
+  <p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_NOT_ACK.GIF" width="271" height="202"></p>
+  <p>&nbsp;</p>
+  <p>&nbsp;</p>
+  <p><font size="4">Vous remarquerez qu'il faut 9 bits pour transmettre un octet 
+    (8 bits de l'octet et le bit ACK).</font></p>
+  <p><font size="4">Avec une fréquence d'horloge f SCL = 100 kHz, le transfert 
+    de 3 octets dure environ :</font></p>
+  <blockquote> 
+    <p><font size="4"><b><font color="#800080">3 octets * 9 bits / 100 000 Hz 
+      = 270 µs</font></b></font></p>
+  </blockquote>
+</blockquote>
+<p>&nbsp;</p>
+<ul>
+  <li><font size="4">Exemple de lecture du DS1307</font></li>
+</ul>
+<p><font size="4">L'émetteur est l'esclave et le récepteur est le 
+  maître.</font></p>
+<p><font size="4">Les registres d'adresses 0x00 à 0x06 du DS1307 contiennent 
+  respectivement les secondes, minutes, heures, jours, dates, mois et années 
+  (cf. datasheet du DS1307).</font></p>
+<p><font size="4">Voici comment lire, d'une seule traite, le contenu des registres 
+  d'adresses 0x00 à 0x06 du DS1307 :</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_dataread.GIF" width="1173" height="222"></font></p>
+<blockquote>
+  <p><font size="4">Chronogramme correspondant :</font></p>
+</blockquote>
+<p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/DS1307_5.GIF" width="1214" height="274"></p>
+<p>&nbsp;</p>
+<blockquote>&nbsp;</blockquote>
+<blockquote>
+  <p><font size="4">1) Pour initier le dialogue, le maître crée une 
+    condition <b>Start</b></font></p>
+  <p><font size="4">2) Le maître envoie l'adresse de l'esclave (1010100) 
+    suivi du bit 0 (bit Write)</font></p>
+  <p><font size="4">3) L'esclave répond (accusé de réception 
+    : bit Acknowledge)</font></p>
+  <p><font size="4">4) Le maître envoie l'adresse du registre (0x00) à 
+    lire </font></p>
+  <p><font size="4">5) L'esclave répond (accusé de réception 
+    : bit Acknowledge)</font></p>
+  <p><font size="4">6) Le maître émet une condition <b>Repeated Start</b></font></p>
+  <p><font size="4">7) Le maître envoie l'adresse de l'esclave (1010100) 
+    suivi du bit 1 (<b>bit Read</b>)</font></p>
+  <p><font size="4">8) L'esclave répond (accusé de réception 
+    : bit Acknowledge)</font></p>
+  <p><font size="4">9) L'esclave envoie le contenu du registre d'adresse 0x00 
+    au maître</font></p>
+  <p><font size="4">10) <b>Le maître répond</b> (accusé de 
+    réception : bit Acknowledge)</font></p>
+  <p><font size="4">11) L'esclave envoie le contenu du registre d'adresse 0x01 
+    (automatiquement incrémenté) au maître</font></p>
+  <p><font size="4">12) Le maître répond (accusé de réception 
+    : bit Acknowledge)</font></p>
+  <p><font size="4">13) L'esclave envoie le contenu du registre d'adresse 0x02 
+    (automatiquement incrémenté) au maître</font></p>
+  <p><font size="4">14) Le maître répond (accusé de réception 
+    : bit Acknowledge)</font></p>
+  <p><b>...</b></p>
+  <p><font size="4">21) L'esclave envoie le contenu du registre d'adresse 0x06 
+    (automatiquement incrémenté) au maître</font></p>
+  <p><font size="4">22) Le maître répond (accusé de réception 
+    : bit <b>Not Acknowledge</b>)</font></p>
+  <p><font size="4">23) Le maître termine le dialogue avec une condition 
+    Stop</font></p>
+</blockquote>
+<blockquote> 
+  <p><font size="4">Le bus I2C est maintement libre (SCL = 1, SDA = 1 : niveaux 
+    de repos).</font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4">Le contenu du registre d'adresse 0x00 du DS1307 est 0x06 (codage 
+  BCD : 06 secondes).</font></p>
+<p><font size="4">Le contenu du registre d'adresse 0x01 est 0x56 (c'est-à-dire 
+  56 minutes).</font></p>
+<p><font size="4">Le contenu du registre d'adresse 0x02 est 0x09 (c'est-à-dire 
+  09 heures).</font></p>
+<p><font size="4">Le contenu du registre d'adresse 0x03 est 0x03 (c'est-à-dire 
+  Mardi).</font></p>
+<p><font size="4">Le contenu du registre d'adresse 0x04 est 0x20 (c'est-à-dire 
+  20 ème jour du mois).</font></p>
+<p><font size="4">Le contenu du registre d'adresse 0x05 est 0x05 (c'est-à-dire 
+  mois de mai).</font></p>
+<p><font size="4">Le contenu du registre d'adresse 0x06 est 0x08 (c'est-à-dire 
+  année 2008).</font></p>
+<p><font size="4">(Mardi 20 mai 2008, 9 heures 56 minutes et 6 secondes)</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><b><font size="5">4 - Le module MSSP du PIC 16F876A, programmé 
+  en langage assembleur</font></b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">Le bus I2C est géré par le module MSSP (Master 
+  Synchronous serial port).</font></p>
+<p><font size="4">Le module MSSP utilise 6 registres pour la gestion du bus I2C 
+  :</font></p>
+<blockquote> 
+  <p><font size="4">• MSSP Control Register (<b>SSPCON</b>) en banque 0</font></p>
+  <p><font size="4">• MSSP Control Register 2 (<b>SSPCON2</b>) en banque 1</font></p>
+  <p><font size="4">• MSSP Status Register (<b>SSPSTAT</b>) en banque 1</font></p>
+  <p><font size="4">• Serial Receive / Transmit Buffer Register (<b>SSPBUF</b>) 
+    en banque 0</font></p>
+  <p><font size="4"> • MSSP Shift Register (<b>SSPSR</b>) (ce registre n'est pas 
+    directement accessible) </font></p>
+  <p><font size="4">• MSSP Address Register (<b>SSPADD</b>) en banque 1</font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b>4-1- Configuration du module MSSP en mode I2C maître</b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">Le PIC 16F876A peut être configuré en maître 
+  ou en esclave.</font></p>
+<p><font size="4">Le PIC 16F876A peut fonctionner jusqu'à 1 MHz (mode High-Speed).</font></p>
+<p><font size="4"> On peut, bien sûr, travailler plus lentement (mode standard 
+  100 kHz ou mode Fast 400 kHz).</font></p>
+<p>&nbsp;</p>
+<p><font size="4">On se placera dans le cas courant suivant :</font></p>
+<ul>
+  <li><font size="4" color="#FF0000"><b>PIC 16F876A configuré en maître</b></font></li>
+  <li><b><font size="4" color="#FF0000">un seul maître (notre PIC 16F876A 
+    ...)</font></b></li>
+  <li><b><font size="4" color="#FF0000">interruption du module MSSP non utilisée 
+    (SSPI : Synchronous Serial Port Interrupt)</font></b></li>
+</ul>
+<p>&nbsp;</p>
+<p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_01.GIF" width="655" height="210"></p>
+<p>&nbsp;</p>
+<p><font size="4">On se place dans l'environnement MPLAB IDE, en langage assembleur.</font></p>
+<p>&nbsp;</p>
+<p><font size="4">a) On commence par configurer les broches <b>RC3/SCK/SCL</b> 
+  et <b>RC4/SDI/SDA</b> en entrées (c'est comme ça).</font></p>
+<p><font size="4">Ces deux broches se trouvent dans le port C.</font></p>
+<p>&nbsp;</p>
+<blockquote>
+  <p><font size="4"><b><font color="#0000FF">bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"> <font color="#0000FF"><b>bsf TRISC , 3</b></font> ; broche 
+    RC3/SCK/SCL configurée en entrée </font></p>
+  <p><font size="4" color="#0000FF"><b>bsf TRISC , 4</b></font><font size="4"> 
+    ; broche RC4/SDI/SDA configurée en entrée </font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4">b) Configuration du bit SMP du registre SSPSTAT (banque 1)</font></p>
+<p><font size="4">La valeur du bit SMP dépend de la fréquence de 
+  l'horloge du bus I2C (f SCL) choisie :</font></p>
+<p>&nbsp;</p>
+<blockquote> 
+  <p><font size="4" color="#0000FF"><b>bsf SSPSTAT , SMP</b></font><font size="4"> 
+    ; SMP = 1 : fréquence de l'horloge du bus I2C = 100 kHz</font></p>
+</blockquote>
+<p><font size="4">ou </font></p>
+<blockquote> 
+  <p><font size="4" color="#0000FF"><b>bsf SSPSTAT , SMP</b></font><font size="4"> 
+    ; SMP = 1 : fréquence de l'horloge du bus I2C = 1 MHz</font></p>
+</blockquote>
+<p><font size="4">ou </font></p>
+<blockquote>
+  <p><font size="4" color="#0000FF"><b>bcf SSPSTAT , SMP</b></font><font size="4"> 
+    ; SMP = 0 : fréquence de l'horloge du bus I2C = 400 kHz</font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4">c) Configuration du bit CKE du registre SSPSTAT (banque 1)</font></p>
+<p><font size="4">Le bit CKE doit être mis à 0.</font></p>
+<p>&nbsp;</p>
+<blockquote>
+  <p><font size="4" color="#0000FF"><b>bcf SSPSTAT , CKE</b></font><font size="4"> 
+    ; CKE = 0 : Disable SMBus specific inputs</font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4">d) Initialisation de la valeur du registre SSPADD (banque 1)</font></p>
+<p>&nbsp;</p>
+<blockquote> 
+  <p><font size="4" color="#800040"><b>f SCL = FOSC/(4 * (SSPADD + 1))</b></font></p>
+  <p><b><font size="4" color="#800040">ou</font></b></p>
+  <p><b><font size="4" color="#800040">(SSPADD) = (FOSC / (4*f SCL)) - 1</font></b></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4">Avec un PIC 16F876A travaillant à 20 MHz (oscillateur 
+  à quartz externe de 20 MHz) et une fréquence d'horloge I2C de 
+  100 kHz, cela donne :</font></p>
+<p>&nbsp;</p>
+<blockquote> 
+  <p><b><font size="4" color="#800040">(SSPADD) = (20 000 000 / (4*100 000)) - 
+    1 = .49 = 0x31</font></b></p>
+</blockquote>
+<p>&nbsp;</p>
+<blockquote>
+  <p><font size="4"><b><font color="#0000FF">movlw 0x31</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4">movwf SSPADD </font></b><font size="4" color="#000000">; 
+    (SSPADD) = (FOSC / (4*f SCL)) - 1 = 0x31</font></font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4">e) Configuration du registre SSPCON (banque 0)</font></p>
+<p>&nbsp;</p>
+<blockquote>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP0</font></b> ; passage 
+    en banque 0</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 0</font></p>
+  <p><font size="4"><b><font color="#0000FF">movlw B'00101000'</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4">movwf SSPCON</font></b></font></p>
+  <p><font size="4" color="#000000">; bit 5 (SSPEN) = 1 : enable the MSSP</font></p>
+  <p><font size="4">; bit 3 (SSPM3) = 1</font></p>
+  <p><font size="4">; bit 2 (SSPM2) = 0</font></p>
+  <p><font size="4">; bit 1 (SSPM1) = 0</font></p>
+  <p><font size="4">; bit 0 (SSPM0) = 0</font></p>
+  <p><font size="4">; (SSPM3 : SSPM0) = (1000) : MSSP configuré dans le 
+    mode I2C maître</font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4">En résumé, avec un PIC 1</font><font size="4">6F876A 
+  travaillant à 20 MHz et une fréquence d'horloge I2C de 100 kHz, 
+  la séquence d'initialisation du module MSSP donne :</font></p>
+<p>&nbsp;</p>
+<blockquote>
+  <p><font size="4"><b><font color="#0000FF">bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"> <font color="#0000FF"><b>bsf TRISC , 3</b></font> ; broche 
+    RC3/SCK/SCL configurée en entrée </font></p>
+  <p><font size="4" color="#0000FF"><b>bsf TRISC , 4</b></font><font size="4"> 
+    ; broche RC4/SDI/SDA configurée en entrée </font></p>
+  <p><font size="4" color="#0000FF"><b>bsf SSPSTAT , SMP</b></font><font size="4"> 
+    ; SMP = 1 : fréquence de l'horloge du bus I2C = 100 kHz</font></p>
+  <p><font size="4" color="#0000FF"><b>bcf SSPSTAT , CKE</b></font><font size="4"> 
+    ; CKE = 0 : Disable SMBus specific inputs</font></p>
+  <p><font size="4"><b><font color="#0000FF">movlw 0x31</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4">movwf SSPADD </font></b><font size="4" color="#000000">; 
+    (SSPADD) = (FOSC / (4*f SCL)) - 1 = 0x31</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP0</font></b> ; passage 
+    en banque 0</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 0</font></p>
+  <p><font size="4"><b><font color="#0000FF">movlw B'00101000'</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4">movwf SSPCON</font></b></font></p>
+  <p><font size="4" color="#000000">; bit 5 (SSPEN) = 1 : enable the MSSP</font></p>
+  <p><font size="4">; bit 3 (SSPM3) = 1</font></p>
+  <p><font size="4">; bit 2 (SSPM2) = 0</font></p>
+  <p><font size="4">; bit 1 (SSPM1) = 0</font></p>
+  <p><font size="4">; bit 0 (SSPM0) = 0</font></p>
+  <p><font size="4">; (SSPM3 : SSPM0) = (1000) : MSSP configuré dans le 
+    mode I2C maître</font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b>4-2- Routines de communication du bus I2C</b></font></p>
+<ul>
+  <li><b><font size="4">4-2-1- Condition Start</font></b></li>
+  <li><font size="4"><b>4-2-2- Ecriture d'un octet (émetteur PIC 16F876A) 
+    </b></font></li>
+  <li><font size="4"><b>4-2-3- Acknowledge (esclave vers maître)</b></font></li>
+  <li><font size="4"><b>4-2-4- Condition Repeated Start</b></font></li>
+  <li><font size="4"><b>4-2-5- Lecture d'un octet (récepteur PIC 16F876A) 
+    </b></font></li>
+  <li><b><font size="4">4-2-6- Acknowledge (maître vers esclave</font></b><font size="4">)</font></li>
+  <li><font size="4"><b>4-2-7- Not Acknowledge <font size="4">(maître vers 
+    esclave)</font></b></font></li>
+  <li><font size="4"><b>4-2-8- Condition Stop</b></font></li>
+</ul>
+<p>&nbsp; </p>
+<ul>
+  <li><b><font size="4">4-2-1- Condition Start</font></b></li>
+</ul>
+<p><font size="4">Pour lancer une opération Start (routine <b>I2C_start)</b>, 
+  il suffit simplement de mettre à 1 le bit SEN (bit 0 du registre SSPCON2, 
+  banque 1).</font> </p>
+<p><font size="4">Au préalable, on vérifie que le bus I2C est libre 
+  (routine <b>I2C_idle</b>).</font></p>
+<p><font size="4">Si ce n'est pas le cas, on attend qu'il le soit (routine <b>I2C_idle</b>).</font></p>
+<p>&nbsp; </p>
+<p><font size="4">Code en assembleur de ma routine <b>I2C_start </b>:</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><b>I2C_start</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF">call I2C_idle</font> </b>; on attend 
+    que le bus I2C soit libre</font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf SSPCON2 , SEN</font></b> ; SEN 
+    = 1 (lancement d'une opération Start)</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP0 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF"> return</font></b></font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4">Vous aurez noté que la routine <b>I2C_start </b> appelle 
+  la routine <b>I2C_idle. </b> </font></p>
+<p><font size="4">La routine <b>I2C_idle</b> teste les 6 bits suivants :</font></p>
+<ul>
+  <li><font size="4">bit SEN (bit 0 du registre SSPCON2, banque 1) :</font> 
+    <ul>
+      <li><font size="4">ce bit est automatiquement mis à 0 quand l'opération 
+        <b>Start</b> est terminée</font></li>
+    </ul>
+  </li>
+  <li><font size="4">bit RSEN (bit 1 du registre SSPCON2, banque 1) :</font> 
+    <ul>
+      <li><font size="4">ce bit est automatiquement mis à 0 quand l'opération<b> 
+        Repeated Start</b> est terminée</font></li>
+    </ul>
+  </li>
+  <li><font size="4">bit PEN (bit 2 du registre SSPCON2, banque 1) :</font> 
+    <ul>
+      <li><font size="4">ce bit est automatiquement mis à 0 quand l'opération 
+        <b>Stop</b> est terminée</font></li>
+    </ul>
+  </li>
+  <li><font size="4">bit RCEN (bit 3 du registre SSPCON2, banque 1) :</font> 
+    <ul>
+      <li><font size="4">ce bit est automatiquement mis à 0 quand la <b>lecture</b> 
+        (maître en récepteur) d'un octet est terminée</font></li>
+    </ul>
+  </li>
+  <li><font size="4">bit ACKEN (bit 4 du registre SSPCON2, banque 1) :</font> 
+    <ul>
+      <li><font size="4">ce bit est automatiquement mis à 0 quand l'opération 
+        <b>Acknowledge</b> (du maître vers l'esclave) est terminée</font></li>
+    </ul>
+  </li>
+  <li><font size="4">bit R_W (bit 2 du registre SSPSTAT, banque 1) </font> 
+    <ul>
+      <li><font size="4">ce bit est automatiquement mis à 0 quand l'<b>écriture</b> 
+        (maître en émetteur) d'un octet est terminée</font></li>
+    </ul>
+  </li>
+</ul>
+<p><font size="4">Le bus I2C est prêt si ces 6 bits sont au niveau 0.</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><b>I2C_idle</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF"> bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+</blockquote>
+<p><font size="4"><b>I2C_idle0</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF">btfsc SSPCON2 , ACKEN</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4"> goto I2C_idle0 </font></b><font size="4" color="#000000">; 
+    le bit ACKEN n'est pas nul</font></font></p>
+  <p><font color="#0000FF"><b><font size="4"> btfsc SSPCON2 , RCEN</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4"> goto I2C_idle0 </font></b><font size="4" color="#000000">; 
+    le bit RCEN n'est pas nul</font></font></p>
+  <p><font color="#0000FF"><b><font size="4"> btfsc SSPCON2 , PEN</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4"> goto I2C_idle0 </font></b><font size="4" color="#000000">; 
+    le bit PEN n'est pas nul</font></font></p>
+  <p><font color="#0000FF"><b><font size="4"> btfsc SSPCON2 , RSEN</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4"> goto I2C_idle0 </font></b><font size="4" color="#000000">; 
+    le bit RSEN n'est pas nul</font></font></p>
+  <p><font color="#0000FF"><b><font size="4"> btfsc SSPCON2 , SEN</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4"> goto I2C_idle0 </font></b><font size="4" color="#000000">; 
+    le bit SEN n'est pas nul</font></font></p>
+  <p><b><font size="4" color="#0000FF">btfsc SSPSTAT , R_W</font></b></p>
+  <p><b><font size="4" color="#0000FF">goto I2C_idle0</font></b><font size="4" color="#000000"> 
+    ; le bit R_W n'est pas nul</font></p>
+  <p><b><font size="4" color="#0000FF">bcf STATUS , RP0 </font></b><font size="4" color="#000000">; 
+    passage en banque 0</font></p>
+  <p><b><font size="4" color="#0000FF">bcf STATUS , RP1 </font></b><font size="4" color="#000000">; 
+    passage en banque 0</font></p>
+  <p><b><font color="#0000FF"> <font size="4">return</font></font></b></p>
+</blockquote>
+<p>&nbsp; </p>
+<p><font size="4"><b>4-2-2- Ecriture d'un octet (émetteur PIC 16F876A) 
+  </b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">Il suffit simplement d'écrire l'octet dans le registre 
+  buffer SSPBUF (banque 0).</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><b>I2C_write</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF">call I2C_idle</font> </b>; on attend 
+    que le bus I2C soit prêt</font></p>
+  <p><font color="#0000FF"><b><font size="4">movwf SSPBUF</font></b></font></p>
+  <p><font size="4"><b><font color="#0000FF">return</font></b></font></p>
+  <p>&nbsp;</p>
+</blockquote>
+<p><font size="4">Il faut placer l'octet à écrire dans l'accumulateur 
+  (W) <b>avant</b> de lancer la routine <b>I2C_write</b> :</font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF">movlw B'XXXXXXXX'</font></b><font color="#0000FF"><font color="#000000"> 
+    ; (XXXXXXXX) sont les 8 bits à écrire, MSB en premier</font></font></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_write</font></b></font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b>4-2-3- Acknowledge (esclave vers maître)</b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">Après l'écriture d'un octet dans l'esclave, on 
+  vérifie que l'esclave renvoit un bit <b>Acknowledge</b> (accusé 
+  de réception).</font></p>
+<p><font size="4">Pour cela, il suffit de lire le bit ACKSTAT (bit 6 du registre 
+  SSPCON2, banque 1).</font></p>
+<p><font size="4">Si le bit ACKSTAT est au niveau 0, tout va bien.</font></p>
+<p><font size="4" color="#000000">Si le bit ACKSTAT est au niveau 1, cela veut 
+  dire que l'esclave n'est pas encore prêt (par exemple, une écriture 
+  dans une EEPROM 24xx64 prendra plusieurs millisecondes).</font></p>
+<p><font size="4" color="#000000">Dans ce cas, on attend le temps qu'il faut ...</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><b>I2C_ACK_slave_to_master</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF"> call I2C_idle </font></b><font color="#000000">; 
+    on attend que le bus I2C soit prêt</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+</blockquote>
+<p><font size="4"><b>I2C_ACK_slave_to_master0</b></font></p>
+<blockquote> 
+  <p><font color="#0000FF"><b><font size="4">btfsc SSPCON2 , ACKSTAT</font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4">goto <b>I2C_ACK_slave_to_master0</b> 
+    </font></b><font size="4" color="#000000">; on attend la réception 
+    du bit ACK</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP0 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font color="#0000FF"><b><font size="4">return</font></b></font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b>4-2-4- Condition Repeated Start</b></font></p>
+<blockquote> 
+  <p>&nbsp;</p>
+</blockquote>
+<p><font size="4">Pour lancer une opération Repeated Start, il suffit simplement 
+  de mettre à 1 le bit RSEN (bit 1 du registre SSPCON2, banque 1).</font> 
+</p>
+<blockquote>
+  <p>&nbsp;</p>
+</blockquote>
+<p><font size="4"><b>I2C_Repeated_Start</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF"> call I2C_idle </font></b><font color="#000000">; 
+    on attend que le bus I2C soit prêt</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf SSPCON2 , RSEN</font></b> ; RSEN 
+    = 1 (lancement d'une opération Repeated Start)</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP0 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF"> return</font></b></font></p>
+</blockquote>
+<blockquote> 
+  <p>&nbsp; </p>
+</blockquote>
+<p><font size="4"><b>4-2-5- Lecture d'un octet (récepteur PIC 16F876A) 
+  </b></font></p>
+<p>&nbsp;</p>
+<p><font size="4" color="#000000">On commence par lancer la réception en 
+  mettant à 1 le bit RCEN (bit 3 du registre SSPCON2, banque 1).</font></p>
+<p><font size="4" color="#000000">Quand la réception est finie, le bit 
+  RCEN est automatiquement mis à 0.</font></p>
+<p><font size="4" color="#000000"> L'octet reçu se trouve dans le registre 
+  buffer SSPBUF (banque 0).</font></p>
+<p>&nbsp;</p>
+<p><font size="4"><b>I2C_read</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF">call I2C_idle</font> </b>; on attend 
+    que le bus I2C soit prêt</font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf SSPCON2 , RCEN </font></b><font color="#0000FF"><font color="#000000"> 
+    ; on lance la réception</font></font></font></p>
+</blockquote>
+<p><font size="4"><b>I2C_read0</b></font></p>
+<blockquote> 
+  <p><font color="#0000FF"><b><font size="4">btfsc <b><font color="#0000FF"> SSPCON2 
+    , RCEN </font></b><font color="#0000FF"><font color="#000000"> </font></font></font></b></font></p>
+  <p><font color="#0000FF"><b><font size="4">goto <b>I2C_read0</b> </font></b><font size="4" color="#000000">; 
+    on attend la fin de la réception</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP0 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><b><font size="4" color="#0000FF">movf SSPBUF , W</font></b></p>
+  <p><font size="4"><b><font color="#0000FF">return</font></b></font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"> Après avoir lancer la routine<b> I2C_read</b>, l'octet 
+  lu est disponible dans l'accumulateur (W) :</font></p>
+<blockquote> 
+  <p>&nbsp;</p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_read</font></b></font></p>
+  <p><font size="4" color="#0000FF"><b> movwf REGISTRE </b><font color="#000000">; 
+    les 8 bits lus sont transférés dans un registre d'usage général </font></font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><b><font size="4">4-2-6- Acknowledge (maître vers esclave</font></b><font size="4">)</font></p>
+<p>&nbsp;</p>
+<p><font size="4">On commence par placer à 0 le bit ACKDT (bit 5 du registre 
+  SSPCON2, banque 1).</font></p>
+<p><font size="4">Pour lancer une opération Acknowledge</font><font size="4">, 
+  il suffit simplement de mettre à 1 le bit ACKEN (bit 4 du registre SSPCON2, 
+  banque 1) :</font> </p>
+<p>&nbsp;</p>
+<p><font size="4"><b>I2C_ACK_master_to_slave</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF">call I2C_idle </font></b><font color="#000000">; 
+    on attend que le bus I2C soit prêt</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf SSPCON2 , ACKDT ;</font></b> 
+    ACKDT = 0</font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf SSPCON2 , ACKEN</font></b> ; 
+    ACKEN = 1 (lancement d'une opération Acknowledge</font><font size="4"></font><font size="4">)</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP0 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF"> return</font></b></font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b>4-2-7- Not Acknowledge <font size="4">(maître vers 
+  esclave)</font></b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">On commence par placer à 1 le bit ACKDT (bit 5 du registre 
+  SSPCON2, banque 1).</font></p>
+<p><font size="4">Pour lancer une opération Not Acknowledge</font><font size="4">, 
+  il suffit simplement de mettre à 1 le bit ACKEN (bit 4 du registre SSPCON2, 
+  banque 1) :</font> </p>
+<p>&nbsp;</p>
+<p><font size="4"><b>I2C_NOACK</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF">call I2C_idle </font></b><font color="#000000">; 
+    on attend que le bus I2C soit prêt</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf SSPCON2 , ACKDT ;</font></b> 
+    ACKDT = 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf SSPCON2 , ACKEN</font></b> ; 
+    ACKEN = 1 (lancement d'une opération Not Acknowledge</font><font size="4"></font><font size="4">)</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP0 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF"> return</font></b></font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b>4-2-8- Condition Stop</b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">Pour lancer une opération Stop, il suffit simplement 
+  de mettre à 1 le bit PEN (bit 2 du registre SSPCON2, banque 1).</font> 
+</p>
+<blockquote>
+  <p>&nbsp;</p>
+</blockquote>
+<p><font size="4"><b>I2C_stop</b></font></p>
+<blockquote> 
+  <p><font size="4"><b><font color="#0000FF"> call I2C_idle </font></b><font color="#000000">; 
+    on attend que le bus I2C soit prêt</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf STATUS , RP0</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1</font></b> ; passage 
+    en banque 1</font></p>
+  <p><font size="4"><b><font color="#0000FF">bsf SSPCON2 , PEN</font></b> ; PEN 
+    = 1 (lancement d'une opération Stop)</font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP0 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF">bcf STATUS , RP1 </font></b><font color="#000000">; 
+    passage en banque 0</font></font></p>
+  <p><font size="4"><b><font color="#0000FF"> return</font></b></font></p>
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b>4-3- Exemples de programmes</b></font></p>
+<p>&nbsp;</p>
+<p><font size="4"><b>4-3-1- Exemple n°1 : Ecriture d'un DS1307</b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">On reprend l'exemple du <i><b><a href="http://fabrice.sincere.pagesperso-orange.fr/cm_electronique/projet_pic/aidememoire/16F876A_bus_I2C/bus_I2C_16F876A.htm#3">paragraphe 
+  3</a></b></i> :</font></p>
+<p><font size="4"><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_datawrite.GIF" width="593" height="167"></font></p>
+<p>&nbsp;</p>
+<blockquote>
+  <p><font size="4"><b><font color="#0000FF">call I2C_start</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">movlw B'11010000'</font></b><font color="#0000FF"><font color="#000000"> 
+    ; 8 bits à écrire (7 bits d'adresse + bit 0 Write)</font></font></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_write</font></b></font></p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_slave_to_master</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">movlw B'00000100'</font></b><font color="#0000FF"><font color="#000000"> 
+    ; 8 bits à écrire</font></font></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_write</font></b></font></p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_slave_to_master</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">movlw B'00100111'</font></b><font color="#0000FF"><font color="#000000"> 
+    ; 8 bits à écrire</font></font></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_write</font></b></font></p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_slave_to_master</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_stop</font></b></font></p>
+  <p>&nbsp;</p>
+</blockquote>
+<p><font size="4"><b>4-3-2- Exemple n°2 : Lecture d'un DS1307</b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">On reprend l'exemple du <i><b><a href="http://fabrice.sincere.pagesperso-orange.fr/cm_electronique/projet_pic/aidememoire/16F876A_bus_I2C/bus_I2C_16F876A.htm#3">paragraphe 
+  3</a></b></i> :</font></p>
+<p><font size="4"><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/I2C_dataread.GIF" width="1173" height="222"></font></p>
+<p>&nbsp;</p>
+<blockquote>
+  <p><font size="4"><b><font color="#0000FF">call I2C_start</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">movlw B'11010000'</font></b><font color="#0000FF"><font color="#000000"> 
+    ; 8 bits à écrire </font><font size="4"><font color="#0000FF"><font color="#000000"> 
+    (7 bits d'adresse + bit 0 Write)</font></font></font></font></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_write</font></b></font></p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_slave_to_master</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">movlw B'00000000'</font></b><font color="#0000FF"><font color="#000000"> 
+    ; 8 bits à écrire</font></font></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_write</font></b></font></p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_slave_to_master</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_Repeated_Start</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">movlw B'11010001'</font></b><font color="#0000FF"><font color="#000000"> 
+    ; 8 bits à écrire </font><font size="4"><font color="#0000FF"><font color="#000000"> 
+    (7 bits d'adresse + bit 1 Read)</font></font></font></font></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_write</font></b></font></p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_slave_to_master</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_read</font></b></font></p>
+  <p><font size="4" color="#0000FF"><b> movwf DATA0 </b><font color="#000000">; 
+    les 8 bits lus sont transférés dans le registre d'usage général DATA0</font></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_master_to_slave</font></b></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_read</font></b></font></p>
+  <p><font size="4" color="#0000FF"><b> movwf DATA1 </b><font color="#000000">; 
+    les 8 bits lus sont transférés dans le registre d'usage général DATA1</font></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_master_to_slave</font></b></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_read</font></b></font></p>
+  <p><font size="4" color="#0000FF"><b> movwf DATA2 </b><font color="#000000">; 
+    les 8 bits lus sont transférés dans le registre d'usage général DATA2</font></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_master_to_slave</font></b></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_read</font></b></font></p>
+  <p><font size="4" color="#0000FF"><b> movwf DATA3 </b><font color="#000000">; 
+    les 8 bits lus sont transférés dans le registre d'usage général DATA3</font></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_master_to_slave</font></b></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_read</font></b></font></p>
+  <p><font size="4" color="#0000FF"><b> movwf DATA4 </b><font color="#000000">; 
+    les 8 bits lus sont transférés dans le registre d'usage général DATA4</font></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_master_to_slave</font></b></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_read</font></b></font></p>
+  <p><font size="4" color="#0000FF"><b> movwf DATA5 </b><font color="#000000">; 
+    les 8 bits lus sont transférés dans le registre d'usage général DATA5</font></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_ACK_master_to_slave</font></b></font></p>
+  <p><font size="4" color="#000000"><b><font color="#0000FF">call I2C_read</font></b></font></p>
+  <p><font size="4" color="#0000FF"><b> movwf DATA6 </b><font color="#000000">; 
+    les 8 bits lus sont transférés dans le registre d'usage général DATA6</font></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4"><b><font color="#0000FF">call I2C_NOACK</font></b></font></p>
+  <p>&nbsp;</p>
+  <p><font size="4" color="#0000FF"><b>call I2C_stop</b></font></p>
+  
+</blockquote>
+<p>&nbsp;</p>
+<p><font size="4"><b>4-4- Exemples de projets complets</b></font></p>
+<ul>
+  <li><font size="4"><a href="http://fabrice.sincere.pagesperso-orange.fr/cm_electronique/projet_pic/RTC/RTC_I2C.htm"><b><i>Horloge et calendrier 
+    (PIC 16F876A et RTC DS1307)</i></b></a></font></li>
+</ul>
+<blockquote> 
+  <p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/RTC01.JPG" width="302" height="125"></p>
+</blockquote>
+<ul>
+  <li><a href="http://fabrice.sincere.pagesperso-orange.fr/cm_electronique/projet_pic/RTC_DS1631/RTC_DS1631_I2C.htm"><b><i><font size="4">Horloge, 
+    calendrier et thermomètre (PIC 16F876A, RTC DS1307 et thermomètre numérique 
+    DS1631)</font></i></b></a></li>
+</ul>
+<blockquote>
+  <p><img src="./Mise en oeuvre du bus I2C avec le PIC 16F876A_files/RTC_DS1631_2.JPG" width="300" height="127"></p>
+</blockquote>
+<p><font size="4"><b> </b></font></p>
+<p><b><font size="5" color="#000000"><a name="SSP"></a>5 - Le module SSP du PIC 
+  16F88</font></b></p>
+<p>&nbsp;</p>
+<p><font size="4">Le module SSP (Synchronous serial port) du PIC 16F88 gère 
+  le bus I2C, mais seulement en mode esclave.</font></p>
+<p><font size="4">C'est la principale différence avec le module MSSP (Master 
+  Synchronous serial port) du PIC 16F87X, qui gère également (au 
+  sens hardware) le mode maître et le mode multi-maîtres.</font></p>
+<p><font size="4">Cependant, le module SSP du PIC 16F88 permet d'implanter de 
+  manière logicielle le mode I2C maître ou multi-maîtres.</font></p>
+<p><font size="4">Vous trouverez toutes les informations utiles sur le <b><i><a href="http://www.microchip.com/">site 
+  de Microchip</a></i></b> :</font></p>
+<ul>
+  <li> <font size="4">Datasheet du PIC 16F88 (chapitre 10 : module SSP)</font></li>
+  <li><font size="4">PICmicro Mid-Range MCU Family Reference Manual</font> </li>
+  <ul>
+    <li><font size="4">Section 15 : Synchronous Serial Port (SSP)</font></li>
+  </ul>
+  <li><font size="4">Application Note : <b>AN554 Software Implementation of I2C 
+    Bus Master</b></font></li>
+  <li><font size="4">Application Note : <b>AN578 Use of the SSP Module in the 
+    I2C Multi-Master Environment</b></font></li>
+</ul>
+<p>&nbsp;</p>
+<p><font size="4"><b><font size="5">6- Bibliographie</font></b></font></p>
+<p>&nbsp;</p>
+<p><font size="4">Site de Philips</font></p>
+<ul>
+  <li><font size="4"><a href="http://www.nxp.com/acrobat_download/literature/9398/39340011.pdf"><b><i>The 
+    I2C-bus specification version 2.1</i></b></a></font></li>
+  <li><font size="4"><a href="http://www.mcc-us.com/i2cHowToUseIt1995.pdf"><b><i>The 
+    I2C-bus and how to use it</i></b></a></font></li>
+  <li><font size="4"><a href="http://www.nxp.com/acrobat_download/applicationnotes/AN10216_1.pdf"><b><i>Application 
+    Note : AN10216-01 I2C Manual</i></b></a></font></li>
+</ul>
+<p>&nbsp;</p>
+<p><font size="4"><a href="http://www.abcelectronique.com/bigonoff/"><b><i>Le 
+  cours de Bigonoff</i></b></a></font></p>
+<ul>
+  <li><font size="4">Etude des PIC 16F87X : Seconde partie (Chapitre 22 : bus 
+    I2C et chapitre 23 : module MSSP en mode I2C)</font></li>
+</ul>
+<p><font size="4"><a href="http://www.microchip.com/"><b><i>Site de Microchip</i></b></a></font></p>
+<ul>
+  <li><font size="4">Datasheet du PIC 16F876A (chapitre 9 : module MSSP)</font></li>
+  <li><font size="4">PICmicro Mid-Range MCU Family Reference Manual</font> </li>
+  <ul>
+    <li><font size="4">Section 17 : Master Synchronous Serial Port (MSSP)</font></li>
+    <li><font size="4">Appendix A : I2C overview</font></li>
+  </ul>
+  <li><font size="4">Datasheet de l'EEPROM 24xx64</font></li>
+</ul>
+<p></p>
+<p><font size="4"><b><i><a href="http://www.maxim-ic.com/">Site de Maxim / Dallas 
+  semiconductor</a></i></b><i><b> </b></i></font></p>
+<ul>
+  <li><font size="4"> Datasheet du DS1631 / DS1731</font></li>
+  <li><font size="4">Datasheet du MAX517 / MAX518</font></li>
+  <li><font size="4">Datasheet du DS1307</font></li>
+</ul>
+<p><font size="4">Christian Tavernier</font></p>
+<ul>
+  <li><font size="4">Les microcontrôleurs PIC : description et mise en oeuvre 
+    ; Editions Dunod ; ISBN 2 10 006722 2</font></li>
+</ul>
+<p>&nbsp;</p>
+<p><b><font size="4" color="#000000">(C) Fabrice Sincère ; Révision 
+  04 </font></b></p>
+<script type="text/javascript">
+//<![CDATA[
+if (typeof _gstat != "undefined") _gstat.audience('','pagesperso-orange.fr');
+//]]>
+</script>
+
+
+</body></html>
