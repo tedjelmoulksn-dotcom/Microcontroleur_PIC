@@ -45,14 +45,16 @@ Supporting reports are in [`docs/`](docs/). The related [GPS receiver project](h
 
 ## Implementation review
 
-The archive preserves the original source:
+The essential debugging path follows configuration, register state and observable output in that order. Verify TRIS/PORT direction first, then the external-interrupt flag and vector, and finally the generated delay cycles. This links each firmware decision to a concrete board behaviour.
+
+The source review highlights the following implementation details:
 
 - The LED sequencer configures RB2–RB5 while its LED selection uses RB0–RB3; its final condition uses assignment instead of comparison.
 - The buzzer handler name `interrupt_traitement_it` does not itself declare an interrupt routine in HI-TECH PICC. Check the compiler's actual ISR syntax and vector handling.
 - ISR-shared state requires appropriate `volatile` declarations and an atomicity review.
 - Busy waits depend on oscillator frequency, compiler optimisation and generated instructions. Button bounce can produce additional interrupt events.
 
-Compilation and hardware behaviour have not been revalidated for this README update.
+Use device-specific compiler diagnostics and simulator traces to confirm the register/interrupt setup before board execution.
 
 ## Licence
 
