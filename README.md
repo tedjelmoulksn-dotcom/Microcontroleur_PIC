@@ -1,84 +1,59 @@
-# TP microcontrôleur PIC16F877A en C
+# PIC16F877A — Bare-Metal C and Assembly Laboratories
 
-Trois programmes de travaux pratiques sur carte PICDEM 2 Plus : un chenillard à quatre LED, une minuterie commandée par bouton poussoir et un buzzer déclenché par interruption externe. Les temporisations sont faites par boucles logicielles, sans timer matériel.
+Register-level exercises on the Microchip PICDEM 2 Plus board: GPIO sequencing, software timing, push-button input and external-interrupt handling. The repository also preserves assembly exercises illustrating control flow and seven-segment output.
 
-## Présentation
+## Hardware and toolchain
 
-- **Cadre** : travaux pratiques de microcontrôleur, première année du cycle ingénieur Instrumentation, Sup Galilée (Université Sorbonne Paris Nord).
-- **Suite** : ces TP préparent le projet [GPS_Microcontroller](https://github.com/tedjelmoulksn-dotcom/GPS_Microcontroller), réalisé sur la même carte.
-- **État** : terminés, non maintenus.
-
-## Matériel et outils
-
-| Élément | Détail |
+| Component | Context |
 |---|---|
-| Carte | Microchip PICDEM 2 Plus Demo Board |
-| Microcontrôleur | PIC16F877A |
-| Compilateur | HI-TECH PICC sous MPLAB |
-| Débogage | Simulateur MPLAB puis ICD 3 |
+| MCU | PIC16F877A, 8-bit PIC architecture |
+| Board | PICDEM 2 Plus |
+| Clock | 4 MHz in the documented exercises |
+| C toolchain | Legacy HI-TECH PICC under MPLAB |
+| Debugging | MPLAB simulator and ICD 3 |
 | Configuration | `__CONFIG(HS & WDTDIS & BOREN & LVPDIS)` |
 
-## Programmes
+These sources use legacy compiler headers and configuration syntax. An XC8 migration requires checking device headers, configuration pragmas and interrupt declarations.
 
-| Fichier | Fonction | Entrées / sorties |
+## C exercises
+
+| Source | Behaviour | Low-level concepts |
 |---|---|---|
-| [`src/chenillard.c`](src/chenillard.c) | Allume successivement les LED D2 à D5 | RB0 à RB3 en sortie |
-| [`src/minuterie.c`](src/minuterie.c) | Allume la LED D2 sur appui du bouton, puis l'éteint après 5 s au plus | RA4 en entrée (bouton), RB0 en sortie (LED) |
-| [`src/buzzer_interruption.c`](src/buzzer_interruption.c) | Compte les appuis par interruption et fait sonner le buzzer à partir du cinquième | RB0 en entrée d'interruption, RC2 en sortie (buzzer) |
+| [LED sequencer](src/chenillard.c) | Four LEDs advanced with approximately 187 ms dwell | TRIS direction registers, PORT writes and symbolic bit selection |
+| [Push-button timer](src/minuterie.c) | Active-low RA4 input controls an RB0 LED with a nominal five-second timeout | Polling, port configuration and calibrated busy waits |
+| [Interrupt-triggered buzzer](src/buzzer_interruption.c) | Counts RB0 falling edges; activates RC2 for counts five through seven and resets at eight | `INTEDG`, `INTE`, `GIE`, `INTF` and shared state |
+| [Intermediate exercises](src/etapes_c/) | LED and delay experiments | Incremental bring-up and timing calibration |
 
-### Chenillard
+The buzzer routine generates about 200 periods of 2 ms, corresponding to a nominal 500 Hz square wave. Delays are software loops, not hardware-timer services.
 
-```mermaid
-flowchart LR
-    D2[D2 allumée] --> D3[D3 allumée] --> D4[D4 allumée] --> D5[D5 allumée] --> D2
+## Assembly exercises
+
+[`src/asm/`](src/asm/) and [`src/asm_2023/`](src/asm_2023/) contain button polling, counters, timing routines and display lookup tables. They expose instruction-level operations such as bit tests, branches, status-flag checks and computed jumps through `PCL`.
+
+See the [assembly module README](src/asm_2023/README.md) for source roles and integration requirements.
+
+## Building and inspecting
+
+```bash
+git clone https://github.com/tedjelmoulksn-dotcom/Microcontroleur_PIC.git
+cd Microcontroleur_PIC
 ```
 
-- `led(led, action)` allume ou éteint une LED désignée par une constante symbolique (`D2` à `D5`, `on` / `off`).
-- `delay_ms(ms)` répète une boucle calibrée d'environ 1 ms ; chaque LED reste allumée 187 ms.
+Create a device-specific project in a compatible Microchip environment, add one exercise at a time and supply its compiler headers and startup configuration. Use the simulator to inspect TRIS/PORT registers, interrupt flags and cycle timing before testing the board.
 
-### Minuterie
+Supporting reports are in [`docs/`](docs/). The related [GPS receiver project](https://github.com/tedjelmoulksn-dotcom/GPS_Microcontroller) extends this platform with serial communication.
 
-```mermaid
-flowchart TD
-    A[Attente : bouton relâché] -->|appui, RA4 = 0| B[LED allumée]
-    B --> C[Comptage des secondes]
-    C -->|5 s écoulées| D[LED éteinte]
-    D --> A
-```
+## Implementation review
 
-- `tempo1ms()` : boucle vide de 0x34 itérations, calibrée pour environ 1 ms.
-- `delay_1s()` : 935 appels de `tempo1ms()`, valeur ajustée au simulateur pour obtenir 1 s.
+The archive preserves the original source:
 
-### Buzzer sur interruption
+- The LED sequencer configures RB2–RB5 while its LED selection uses RB0–RB3; its final condition uses assignment instead of comparison.
+- The buzzer handler name `interrupt_traitement_it` does not itself declare an interrupt routine in HI-TECH PICC. Check the compiler's actual ISR syntax and vector handling.
+- ISR-shared state requires appropriate `volatile` declarations and an atomicity review.
+- Busy waits depend on oscillator frequency, compiler optimisation and generated instructions. Button bounce can produce additional interrupt events.
 
-```mermaid
-flowchart TD
-    A[Front descendant sur RB0] --> B[Routine d'interruption :<br/>INTF = 0, count + 1]
-    B --> C{count}
-    C -->|moins de 5| D[Buzzer éteint]
-    C -->|5 à 7| E[Buzzer actif]
-    C -->|8| F[Remise à zéro du compteur]
-```
-
-- Configuration : `INTEDG = 0` (front descendant), `INTE = 1`, `GIE = 1`, drapeau `INTF` remis à zéro dans la routine.
-- `BUZER_on()` génère un signal carré sur RC2 : 200 périodes de 2 ms, soit environ 500 Hz.
-- La variable `count` est globale pour être partagée entre la routine d'interruption et le programme principal.
-
-## Notions abordées dans le compte rendu
-
-- Calibration d'une temporisation logicielle et vérification par points d'arrêt.
-- Lecture d'un bouton poussoir et niveaux de tension sur RA4 et RB0.
-- Interruptions matérielles et plage de fréquences audibles pour le buzzer.
-
-Le compte rendu est dans [`docs/`](docs).
-
-## Limites
-
-- **Chenillard** : `init_port()` configure RB2 à RB5 en sortie alors que les LED sont sur RB0 à RB3, et la dernière comparaison de `led()` utilise `=` au lieu de `==`. Le fichier est publié tel qu'il a été retrouvé.
-- **Buzzer** : la routine est déclarée `void interrupt_traitement_it(void)` ; avec HI-TECH PICC, le mot-clé `interrupt` doit être séparé du nom (`void interrupt traitement_it(void)`) pour qu'elle soit réellement appelée sur interruption. Le fichier est publié tel qu'il a été retrouvé.
-- **Temporisations** : dépendantes du compilateur et de l'oscillateur (4 MHz) ; elles ne sont pas précises.
-- **Compilation** : non rejouée ; les en-têtes `pic.h` et `pic168xa.h` viennent du compilateur HI-TECH PICC.
+Compilation and hardware behaviour have not been revalidated for this README update.
 
 ## Licence
 
-Aucune licence n'a été définie pour ce code.
+No project-wide licence has been defined.
