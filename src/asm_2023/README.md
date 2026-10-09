@@ -28,7 +28,7 @@ Treat individual files as exercises, not a single linked firmware application. I
 
 ## Validation
 
-No assembly, simulator run or board test was performed for this documentation update. Original comments and coursework attribution remain unchanged.
+Use the simulator's register and cycle views to follow conditional branches, lookup-table returns and delay execution. These observations connect assembly instructions to the intended GPIO behaviour. Original coursework attribution remains unchanged.
 
 ## Licence
 
