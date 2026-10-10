@@ -2,6 +2,10 @@
 
 PIC16F877A coursework on GPIO, software timing, push buttons, interrupts, displays and EEPROM. The main examples implement an LED sequence, a timed LED and a buzzer triggered by external interrupts.
 
+![Microcontroleur PIC project overview](assets/project-overview.svg)
+
+*Independent PIC laboratory examples; each program uses its own hardware configuration.*
+
 ## Repository guide
 
 | Location | Contents |
